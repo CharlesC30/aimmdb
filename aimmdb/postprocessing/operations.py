@@ -102,6 +102,44 @@ class UnaryOperator(Operator):
             )
 
 
+class MultiOperator(Operator):
+    """Specialized operator class which takes an arbitrary number of inputs.
+    All inputs must be of instance :class:`DataFrameClient`.
+
+    Particularly, the operator object's ``__call__`` method can be executed on
+    an arbitrary number of :class:`DataFrameClient` objects. The operator will
+    return a single dictionary with keys "data" and "metadata".
+    """
+
+    def __call__(self, *inps):
+        if all([isinstance(inp, (DataFrameClient, dict)) for inp in inps]):
+            inp_data = [
+                inp.read() if isinstance(inp, DataFrameClient) else inp["data"]
+                for inp in inps
+            ]
+
+        else:
+            raise ValueError(
+                f"All inputs must be of type DataFrameClient or dict"
+            )
+
+        if isinstance(inp, DataFrameClient):
+            return {
+                "data": self._process_data(inp.read()),
+                "metadata": self._process_metadata(inp.metadata),
+            }
+        elif isinstance(inp, dict):
+            return {
+                "data": self._process_data(inp["data"]),
+                "metadata": self._process_metadata(inp["metadata"]),
+            }
+        else:
+            raise ValueError(
+                f"Input type {type(inp)} must be either DataFrameClient or "
+                "dict"
+            )
+
+
 class Identity(UnaryOperator):
     """The identity operation. Does nothing. Primarily used for testing
     purposes."""
