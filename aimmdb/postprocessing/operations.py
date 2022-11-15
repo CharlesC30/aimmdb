@@ -104,12 +104,43 @@ class UnaryOperator(Operator):
 
 class MultiOperator(Operator):
     """Specialized operator class which takes an arbitrary number of inputs.
-    All inputs must be of instance :class:`DataFrameClient`.
+    All inputs must be of instance :class:`DataFrameClient` or `dict`.
 
     Particularly, the operator object's ``__call__`` method can be executed on
-    an arbitrary number of :class:`DataFrameClient` objects. The operator will
+    an arbitrary number of :class:`DataFrameClient` or `dict` objects. The operator will
     return a single dictionary with keys "data" and "metadata".
     """
+
+    def _process_metadata(self, *metadata):
+        """Processing of the metadata dictionary object. Takes arbitrary number
+        of :class:`dict` objects as input and returns a new dictionary as output
+        with the following:
+
+            1. metadata["_tiled"]["uid"] is replaced with a new uuid string.
+            2. metadata["post_processing"] is created with keys that indicate
+               the current state of the class, the parent ids
+
+        Parameters
+        ----------
+        metadata : dict
+            The metadata dictionaries accessed via ``df_client.metadata``.
+
+        Returns
+        -------
+        dict
+            The new metadata object for the post-processed child.
+        """
+
+        dt = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        return {
+            "_tiled": {"uid": uid()},  # Assign a new uid
+            "_post_processing": {
+                "parents": [md["_tiled"]["uid"] for md in metadata],
+                "operator": self.as_dict(),
+                "kwargs": self.__dict__,
+                "datetime": f"{dt} UTC",
+            },
+        }
 
     def __call__(self, *inps):
         if all([isinstance(inp, (DataFrameClient, dict)) for inp in inps]):
@@ -117,26 +148,18 @@ class MultiOperator(Operator):
                 inp.read() if isinstance(inp, DataFrameClient) else inp["data"]
                 for inp in inps
             ]
+            inp_metadata = [
+                inp.metadata if isinstance(inp, DataFrameClient) else inp["metadata"]
+                for inp in inps
+            ]
+            return {
+                "data": self._process_data(*inp_data),
+                "metadata": self._process_metadata(*inp_metadata),
+            }
 
         else:
             raise ValueError(
                 f"All inputs must be of type DataFrameClient or dict"
-            )
-
-        if isinstance(inp, DataFrameClient):
-            return {
-                "data": self._process_data(inp.read()),
-                "metadata": self._process_metadata(inp.metadata),
-            }
-        elif isinstance(inp, dict):
-            return {
-                "data": self._process_data(inp["data"]),
-                "metadata": self._process_metadata(inp["metadata"]),
-            }
-        else:
-            raise ValueError(
-                f"Input type {type(inp)} must be either DataFrameClient or "
-                "dict"
             )
 
 
