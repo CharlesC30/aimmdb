@@ -143,7 +143,7 @@ class MultiOperator(Operator):
         }
 
     def __call__(self, *inps):
-        if all([isinstance(inp, (DataFrameClient, dict)) for inp in inps]):
+        if all(isinstance(inp, (DataFrameClient, dict)) for inp in inps):
             inp_data = [
                 inp.read() if isinstance(inp, DataFrameClient) else inp["data"]
                 for inp in inps
@@ -176,7 +176,7 @@ class AverageData(MultiOperator):
     y_column : str, optional
         References a single column in the DataFrames (the "y-axis").
         This is the data that will be averaged from each DataFrame.
-        Default is "mu"
+        Default is "mu".
     """
 
     def __init__(self, x_column="energy", y_column="mu"):
@@ -197,8 +197,8 @@ class AverageData(MultiOperator):
         averaged_data = np.average(all_data, axis=0)
         x_values = dfs[0][self.x_column]
         assert all(
-            df[self.x_column] == x_values for df in dfs
-        ), "all data should have the same x-values"
+            (df[self.x_column] == x_values).all() for df in dfs
+        ), "all data should have the same x-values before averaging"
         new_data = {self.x_column: x_values, self.y_column: averaged_data}
 
         return pd.DataFrame(new_data)
