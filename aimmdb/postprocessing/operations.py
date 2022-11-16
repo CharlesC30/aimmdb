@@ -195,6 +195,13 @@ class AverageData(MultiOperator):
         """
         all_data = np.array([df[self.y_column] for df in dfs])
         averaged_data = np.average(all_data, axis=0)
+        x_values = dfs[0][self.x_column]
+        assert all(
+            df[self.x_column] == x_values for df in dfs
+        ), "all data should have the same x-values"
+        new_data = {self.x_column: x_values, self.y_column: averaged_data}
+
+        return pd.DataFrame(new_data)
 
 
 class Identity(UnaryOperator):
