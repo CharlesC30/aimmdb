@@ -112,7 +112,7 @@ class MultiOperator(Operator):
     """
 
     def _process_metadata(self, *metadata):
-        """Processing of the metadata dictionary object. Takes arbitrary number
+        """Processing of the metadata dictionary objects. Takes arbitrary number
         of :class:`dict` objects as input and returns a new dictionary as output
         with the following:
 
@@ -149,7 +149,9 @@ class MultiOperator(Operator):
                 for inp in inps
             ]
             inp_metadata = [
-                inp.metadata if isinstance(inp, DataFrameClient) else inp["metadata"]
+                inp.metadata
+                if isinstance(inp, DataFrameClient)
+                else inp["metadata"]
                 for inp in inps
             ]
             return {
@@ -161,6 +163,38 @@ class MultiOperator(Operator):
             raise ValueError(
                 f"All inputs must be of type DataFrameClient or dict"
             )
+
+
+class AverageData(MultiOperator):
+    """Average data (mu) from multiple XAS spectra.
+
+    Parameters
+    ----------
+    x_columns : str, optional
+        References a single column in the DataFrames (the "x-axis").
+        This should be the same for all DataFrames. Default is "energy".
+    y_column : str, optional
+        References a single column in the DataFrames (the "y-axis").
+        This is the data that will be averaged from each DataFrame.
+        Default is "mu"
+    """
+
+    def __init__(self, x_column="energy", y_column="mu"):
+        self.x_column = x_column
+        self.y_column = y_column
+
+    def _process_data(self, *dfs):
+        """
+        Takes in an arbitrary number of :class:`pd.DataFrame` objects.
+        The "y_column" is taken from each DataFrame and averaged.
+
+        Returns:
+        --------
+        pd.DataFrame
+            Averaged data in new DataFrame.
+        """
+        all_data = np.array([df[self.y_column] for df in dfs])
+        averaged_data = np.average(all_data, axis=0)
 
 
 class Identity(UnaryOperator):
@@ -474,7 +508,7 @@ class NormalizeLarch(UnaryOperator):
             norm_mu = larch_group.flat
             new_data.update({column: norm_mu})
 
-        return new_data
+        return pd.DataFrame(new_data)
 
 
 # TODO
