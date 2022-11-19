@@ -1,4 +1,3 @@
-from unittest.util import _MIN_DIFF_LEN
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -44,6 +43,7 @@ def ingest(path, return_uid=False):
     Data is stored in .dat file which contains commented lines (denoted by #) with metadata,
     and columnated data below the metadata.
     Data columns should correspond to energy, i0, it, ir, iff, and aux channels.
+    DataFrame for aimmdb contains only energy and absorption coefficient (mu).
     There are several ways to calculate mu based on the mode of the measurement:
     - mu_trans = -ln(it/i0)
     - mu_fluor = iff/i0
@@ -60,7 +60,7 @@ def ingest(path, return_uid=False):
 
     Returns
     -------
-    tuple(tuple[DataFrame, dict[str, str]], tuple[DataFrame, dict[str, str]], tuple[DataFrame, dict[str, str]])
+    tuple({'data': DataFrame, 'metadata': dict}, {'data': DataFrame, 'metadata': dict}, {'data': DataFrame, 'metadata': dict})
         Database entries corresponding to the transmission, fluorescence, and reference channels.
 
     Other Parameters
@@ -78,27 +78,27 @@ def ingest(path, return_uid=False):
     temp_data["mu_ref"] = -np.log(temp_data["ir"] / temp_data["i0"])
 
     df_trans = temp_data[["energy", "mu_trans"]]
-    temp_md.update(channel="transmission")
-    md_trans = temp_md
+    temp_md["channel"] = "transmission"
+    md_trans = temp_md.copy()
 
     df_fluor = temp_data[["energy", "mu_fluor"]]
-    temp_md.update(channel="fluoresence")
-    md_fluor = temp_md
+    temp_md["channel"] = "fluoresence"
+    md_fluor = temp_md.copy()
 
     df_ref = temp_data[["energy", "mu_ref"]]
-    temp_md.update(channel="reference")
-    md_ref = temp_md
+    temp_md["channel"] = "reference"
+    md_ref = temp_md.copy()
 
     if return_uid:
         uid = temp_md["Scan.uid"]
         return (
-            (df_trans, md_trans, uid),
-            (df_fluor, md_fluor, uid),
-            (df_ref, md_ref, uid),
+            dict(data=df_trans, metadata=md_trans, uid=uid),
+            dict(data=df_fluor, metadata=md_fluor, uid=uid),
+            dict(data=df_ref, metadata=md_ref, uid=uid),
         )
     else:
         return (
-            (df_trans, md_trans),
-            (df_fluor, md_fluor),
-            (df_ref, md_ref),
+            dict(data=df_trans, metadata=md_trans),
+            dict(data=df_fluor, metadata=md_fluor),
+            dict(data=df_ref, metadata=md_ref),
         )
