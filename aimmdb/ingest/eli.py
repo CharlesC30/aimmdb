@@ -82,7 +82,7 @@ def ingest(path, return_uid=False):
     md_trans = temp_md.copy()
 
     df_fluor = temp_data[["energy", "mu_fluor"]]
-    temp_md["channel"] = "fluoresence"
+    temp_md["channel"] = "fluorescence"
     md_fluor = temp_md.copy()
 
     df_ref = temp_data[["energy", "mu_ref"]]
