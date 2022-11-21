@@ -1,5 +1,7 @@
 from aimmdb.ingest.eli import ingest, read_metadata_and_header
 from pathlib import Path
+import numpy as np
+import pandas as pd
 
 
 def test_read_md_and_header():
@@ -22,17 +24,18 @@ def test_read_md_and_header():
 def test_ingest():
     test_path = Path("aimmdb/_tests/eli_test_file.dat")
     data = ingest(test_path, return_uid=True)
-    for channel_data in data:
-        uid = channel_data[2]
+    test_channels = ["transmission", "fluorescence", "reference"]
+    mu_channels = ["mu_trans", "mu_fluor", "mu_ref"]
+    for channel_data, tst_ch, mu_ch in zip(data, test_channels, mu_channels):
+        uid = channel_data["uid"]
         assert uid == "d66dda13-d69c-4ca6-8fb7-76290ad71073"
-        md = channel_data[1]
+        md = channel_data["metadata"]
         channel = md["channel"]
-        assert channel in ["transmission", "fluorescence", "reference"]
-        df = channel_data[0]
+        assert channel == tst_ch
+        df = channel_data["data"]
         with open(test_path) as test_file:
             data_lines = [
                 line for line in test_file.readlines() if not line.startswith("#")
             ]
             assert df.shape[0] == len(data_lines)
-        mu_channels = ["mu_trans", "mu_fluor", "mu_ref"]
-        assert any([(mu in df.columns) for mu in mu_channels])
+        assert mu_ch in list(df.columns)
