@@ -102,8 +102,11 @@ class UnaryOperator(Operator):
             )
 
 
-class MultiOperator(Operator):
-    """Specialized operator class which takes an arbitrary number of inputs.
+class MisoOperator(Operator):
+    """
+    Multiple input single output (MISO) operator class.
+    Specialized operator class which takes an arbitrary number of inputs
+    and returns a single output.
     All inputs must be of instance :class:`DataFrameClient` or `dict`.
 
     Particularly, the operator object's ``__call__`` method can be executed on
@@ -165,7 +168,108 @@ class MultiOperator(Operator):
             )
 
 
-class AverageData(MultiOperator):
+class MimoOperator(Operator):
+    """
+    Multiple input multiple output (MIMO) operator class.
+    Specialized operator class which takes an arbitrary number of inputs
+    and returns an equal number of outputs.
+    All inputs must be of instance :class:`DataFrameClient` or `dict`.
+
+    Particularly, the operator object's ``__call__`` method can be executed on
+    an arbitrary number of :class:`DataFrameClient` or `dict` objects. For each
+    object passed some operation will be performed and the result will be returned
+    as a `dict` with keys "data" and "metatdata".
+    """
+
+    def _process_metadata(self, *metadata):
+        """Processing of the metadata dictionary objects. Takes arbitrary number
+        of :class:`dict` objects as input and returns a new dictionary for each input
+        with the following:
+
+            1. metadata["_tiled"]["uid"] is replaced with a new uid string.
+            2. metadata["post_processing"] is created with keys that indicate
+               the current state of the class. This includes a "parent" key
+               with the uid of the specific object that was operated on, and
+               a "relatives" key with the uids of all operator inputs.
+
+        Parameters
+        ----------
+        metadata : dict
+            The metadata dictionaries accessed via ``df_client.metadata``.
+
+        Returns
+        -------
+        dict
+            The new metadata object for the post-processed child.
+        """
+
+        dt = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        input_uids = [md["_tiled"]["uid"] for md in metadata]
+        return [
+            {
+                "_tiled": {"uid": uid()},  # Assign a new uid
+                "_post_processing": {
+                    "parent": md["_tiled"]["uid"],
+                    "relatives": input_uids,
+                    "operator": self.as_dict(),
+                    "kwargs": self.__dict__,
+                    "datetime": f"{dt} UTC",
+                },
+            }
+            for md in metadata
+        ]  # return dict for each entry
+
+    def __call__(self, *inps):
+        if all(isinstance(inp, (DataFrameClient, dict)) for inp in inps):
+            inp_data = [
+                inp.read() if isinstance(inp, DataFrameClient) else inp["data"]
+                for inp in inps
+            ]
+            inp_metadata = [
+                inp.metadata
+                if isinstance(inp, DataFrameClient)
+                else inp["metadata"]
+                for inp in inps
+            ]
+            out_data = self._process_data(*inp_data)
+            out_metadata = self._process_metadata(*inp_metadata)
+            return [
+                {
+                    "data": d,
+                    "metadata": md,
+                }
+                for d, md in zip(out_data, out_metadata)
+            ]
+
+        else:
+            raise ValueError(
+                f"All inputs must be of type DataFrameClient or dict"
+            )
+
+
+class GroupIdentity(MimoOperator):
+    """Modified identity operation to work with MimoOperator baseclass.
+    Does nothing. Primarily used for testing."""
+
+    def __init__(self):
+        super().__init__()
+
+    def _process_data(self, *dfs):
+        """
+        Parameters
+        ----------
+        dfs : tuple of pandas.DataFrame
+            The dataframe objects to process.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+
+        return [df for df in dfs]
+
+
+class AverageData(MisoOperator):
     """Average data (mu) from multiple XAS spectra.
 
     Parameters
@@ -193,12 +297,12 @@ class AverageData(MultiOperator):
         pd.DataFrame
             Averaged data in new DataFrame.
         """
-        all_data = np.array([df[self.y_column] for df in dfs])
-        averaged_data = np.average(all_data, axis=0)
         x_values = dfs[0][self.x_column]
         assert all(
             (df[self.x_column] == x_values).all() for df in dfs
         ), "all data should have the same x-values before averaging"
+        all_data = np.array([df[self.y_column] for df in dfs])
+        averaged_data = np.mean(all_data, axis=0)
         new_data = {self.x_column: x_values, self.y_column: averaged_data}
 
         return pd.DataFrame(new_data)
