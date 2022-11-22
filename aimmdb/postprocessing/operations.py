@@ -172,7 +172,7 @@ class MimoOperator(Operator):
     """
     Multiple input multiple output (MIMO) operator class.
     Specialized operator class which takes an arbitrary number of inputs
-    and returns an equal number of outputs.
+    and returns a list with an equal number of outputs.
     All inputs must be of instance :class:`DataFrameClient` or `dict`.
 
     Particularly, the operator object's ``__call__`` method can be executed on
@@ -199,8 +199,8 @@ class MimoOperator(Operator):
 
         Returns
         -------
-        dict
-            The new metadata object for the post-processed child.
+        list of dict
+            List of new metadata object for each post-processed child.
         """
 
         dt = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -263,7 +263,7 @@ class GroupIdentity(MimoOperator):
 
         Returns
         -------
-        pandas.DataFrame
+        list of pandas.DataFrame
         """
 
         return [df for df in dfs]
