@@ -27,9 +27,9 @@ def test_ingest():
     test_channels = ["transmission", "fluorescence", "reference"]
     mu_channels = ["mu_trans", "mu_fluor", "mu_ref"]
     for channel_data, tst_ch, mu_ch in zip(data, test_channels, mu_channels):
-        uid = channel_data["uid"]
-        assert uid == "d66dda13-d69c-4ca6-8fb7-76290ad71073"
         md = channel_data["metadata"]
+        uid = channel_data["uid"]
+        assert uid == md["_tiled"]["uid"] == "d66dda13-d69c-4ca6-8fb7-76290ad71073"
         channel = md["channel"]
         assert channel == tst_ch
         df = channel_data["data"]
