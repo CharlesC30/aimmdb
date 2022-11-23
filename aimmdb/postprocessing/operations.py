@@ -303,7 +303,12 @@ class AverageData(MisoOperator):
         ), "all data should have the same x-values before averaging"
         all_data = np.array([df[self.y_column] for df in dfs])
         averaged_data = np.mean(all_data, axis=0)
-        new_data = {self.x_column: x_values, self.y_column: averaged_data}
+        std_dev = np.std(all_data, axis=0)
+        new_data = {
+            self.x_column: x_values,
+            self.y_column: averaged_data,
+            "stddev": std_dev,
+        }
 
         return pd.DataFrame(new_data)
 
