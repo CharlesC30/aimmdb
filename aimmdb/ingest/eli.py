@@ -37,13 +37,6 @@ def read_metadata_and_header(path):
     return metadata, header
 
 
-def add_tiled_uid(md: dict):
-    """Add "_tiled" key to metadata `dict`. This makes it easier to work with
-    postprocessing operators."""
-    md.update(_tiled={"uid": ""})
-    md["_tiled"]["uid"] = md["Scan.uid"]
-
-
 def ingest(path, return_uid=False):
     """Prepare scan data from Eli (ISS beamline) for entry into AIMMDB
 
@@ -78,7 +71,6 @@ def ingest(path, return_uid=False):
         piece of information that may be useful to store separately.
     """
     temp_md, hdr = read_metadata_and_header(path)
-    add_tiled_uid(temp_md)
 
     temp_data = pd.read_csv(path, delim_whitespace=True, comment="#", names=hdr.split())
     temp_data["mu_trans"] = -np.log(temp_data["it"] / temp_data["i0"])
