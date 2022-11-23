@@ -271,6 +271,7 @@ class GroupIdentity(MimoOperator):
 
 class AverageData(MisoOperator):
     """Average data (mu) from multiple XAS spectra.
+    Also calculates standard deviation at each energy point.
 
     Parameters
     ----------
@@ -296,6 +297,7 @@ class AverageData(MisoOperator):
         --------
         pd.DataFrame
             Averaged data in new DataFrame.
+            Standard deviation is added to new "stddev" column.
         """
         x_values = dfs[0][self.x_column]
         assert all(
