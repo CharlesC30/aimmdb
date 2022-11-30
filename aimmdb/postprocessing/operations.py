@@ -75,7 +75,6 @@ class UnaryOperator(Operator):
 
         dt = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         return {
-            "_tiled": {"uid": uid()},  # Assign a new uid
             "_post_processing": {
                 "parents": [metadata["_tiled"]["uid"]],
                 "operator": self.as_dict(),
@@ -136,7 +135,6 @@ class MisoOperator(Operator):
 
         dt = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         return {
-            "_tiled": {"uid": uid()},  # Assign a new uid
             "_post_processing": {
                 "parents": [md["_tiled"]["uid"] for md in metadata],
                 "operator": self.as_dict(),
@@ -207,7 +205,6 @@ class MimoOperator(Operator):
         input_uids = [md["_tiled"]["uid"] for md in metadata]
         return [
             {
-                "_tiled": {"uid": uid()},  # Assign a new uid
                 "_post_processing": {
                     "parent": md["_tiled"]["uid"],
                     "relatives": input_uids,
