@@ -7,6 +7,7 @@ from monty.json import MSONable
 import numpy as np
 import pandas as pd
 from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy import stats
 from sklearn.linear_model import LinearRegression
 from tiled.client.dataframe import DataFrameClient
 from larch import Group as xafsgroup
@@ -267,6 +268,76 @@ class GroupIdentity(MimoOperator):
         """
 
         return [df for df in dfs]
+
+
+class AlignGrids(MimoOperator):
+    def __init__(
+        self,
+        x_column="energy",
+        y_columns=["mu"],
+        grid_master_index=0,
+        interpolated_univariate_spline_kwargs=dict(),
+    ):
+        self.x_column = x_column
+        self.y_columns = y_columns
+        self.grid_master_index = grid_master_index
+        self.interpolated_univariate_spline_kwargs = (
+            interpolated_univariate_spline_kwargs
+        )
+
+    def _process_data(self, *dfs):
+        master_grid = dfs[self.grid_master_index][self.x_column]
+        aligned_dfs = []
+        for df in dfs:
+            current_grid = df[self.x_column]
+            if not np.array_equal(current_grid, master_grid):
+                new_data = {self.x_column: master_grid}
+                for column in self.y_columns:
+                    ius = InterpolatedUnivariateSpline(
+                        current_grid,
+                        df[column],
+                        **self.interpolated_univariate_spline_kwargs,
+                    )
+                new_data[column] = ius(master_grid)
+                aligned_dfs.append(new_data)
+            else:
+                aligned_dfs.append(df)
+        return aligned_dfs
+
+
+class CheckForOutliers(MimoOperator):
+    def __init__(
+        self, x_column="energy", y_column="mu", data_window=60, threshold=25
+    ):
+        self.x_column = x_column
+        self.y_column = y_column
+        self.data_window = data_window
+        self.threshold = threshold
+
+    def _process_data(self, *dfs):
+        if len(dfs) < 10:
+            print(
+                "WARNING: only recommended for datasets with 10 or more entries"
+            )
+        all_data = np.array([df[self.y_column] for df in dfs])
+        n_pts = all_data.shape[1]
+
+        trim_fraction = (1 - self.data_window / 100) / 2
+        trim_data = stats.trimboth(all_data, trim_fraction, axis=0)
+        trim_mean = np.mean(trim_data, axis=0)
+        trim_std = np.std(trim_data, axis=0)
+
+        outlier = []
+        for df in dfs:
+            data = df[self.y_column]
+            deviation_from_mean = (
+                1 / n_pts * np.sum(((data - trim_mean) / trim_std) ** 2)
+            )
+            if deviation_from_mean > self.threshold:
+                outlier.append(True)
+            else:
+                outlier.append(False)
+        return outlier
 
 
 class AverageData(MisoOperator):
