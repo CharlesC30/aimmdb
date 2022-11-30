@@ -84,6 +84,10 @@ def outlier_rejection(*dfs, data_window=60, threshold=25):
 
     trim_mean = np.mean(trim_data, axis=0)
     trim_std = np.std(trim_data, axis=0)
+    deviation_from_mean = (
+        np.sum(((all_data - trim_mean) / trim_std) ** 2, axis=1) / n_pts
+    )
+    print(deviation_from_mean**0.5)
     for df in dfs:
         data = df["mu_trans"]
         deviation_from_mean = (
