@@ -3,7 +3,26 @@ import sys
 from os import path
 
 from setuptools import setup, find_packages
+import versioneer
 
+
+min_version = (3, 9)
+if sys.version_info < min_version:
+    error = """
+aimmdb does not support Python {0}.{1}.
+Python {2}.{3} and above is required. Check your Python version like so:
+
+python3 --version
+
+This may be due to an out-of-date pip. Make sure you have the latest version.
+
+Upgrade pip like so:
+
+pip install --upgrade pip
+""".format(
+        *(sys.version_info[:2] + min_version)
+    )
+    sys.exit(error)
 
 here = path.abspath(path.dirname(__file__))
 
@@ -22,8 +41,9 @@ def get_data_files():
 
 setup(
     name="aimmdb",
-    version="0.1",
-    packages=find_packages(),
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
+    packages=find_packages(exclude=["docs", "aimmdb/_tests"]),
     install_requires=[
         "tiled[all]",
         "psycopg2-binary",
@@ -31,8 +51,8 @@ setup(
         "pyarrow",
         "h5py",
     ],
+    python_requires=">={}".format(".".join(str(n) for n in min_version)),
     extras_require={"test": ["mongomock", "pytest"]},
-    python_requires=">=3.9",
     entry_points={
         "tiled.structure_client": [
             "MongoAdapter = aimmdb.client:MongoCatalog",
