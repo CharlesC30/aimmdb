@@ -1,13 +1,7 @@
-import operator
-from typing import List, Optional
-
-import msgpack
 from tiled.client.dataframe import DataFrameClient
 from tiled.client.node import Node
-from tiled.client.utils import handle_error
 
-import aimmdb
-from aimmdb.schemas import SampleData, XASMetadata
+from aimmdb.schemas import SampleData
 
 
 def _describe_xas(*, element, edge, sample_name=None):
@@ -59,15 +53,6 @@ class XASKey:
 
 
 class AIMMCatalog(Node):
-    def write_xas(self, df, metadata, specs=None):
-        specs = list(specs or [])
-        specs.append("XAS")
-
-        validated_metadata = XASMetadata.parse_obj(metadata)
-        key = self.write_dataframe(df, validated_metadata.dict(), specs=specs)
-
-        return key
-
     def write_sample(self, metadata):
         sample = SampleData.parse_obj(metadata)
         document = self.context.post_json("/sample", sample.dict())

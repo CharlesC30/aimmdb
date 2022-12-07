@@ -53,7 +53,7 @@ class WritingArrayAdapter:
 
     @property
     def metadata(self):
-        out = self.doc.metadata.dict()
+        out = self.doc.metadata
         _tiled = {"uid": self.doc.uid}
         out["_tiled"] = _tiled
         return out

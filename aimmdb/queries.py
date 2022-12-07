@@ -1,11 +1,9 @@
-import json
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List
 
 import pydantic
-from tiled.queries import Comparison, Contains, Eq, In, NotIn, NotEq, register
-from tiled.query_registration import register
+from tiled.queries import (Comparison, Contains, Eq, In, NotEq, NotIn, Specs,
+                           StructureFamily)
 
 JSONSerializable = Any  # Feel free to refine this.
 
@@ -32,7 +30,7 @@ def make_mongo_query_eq(query, prefix=None):
 
 
 def make_mongo_query_neq(query, prefix=None):
-    assert isinstance(query, Eq)
+    assert isinstance(query, NotEq)
     mongo_key = ".".join([prefix, query.key]) if prefix else query.key
     mongo_query = {mongo_key: {"$ne": query.value}}
     return mongo_query
@@ -86,13 +84,31 @@ def run_notin(query, tree):
     return tree.new_variation(queries=tree.queries + [mongo_query])
 
 
+def run_structure_family(query, tree):
+    mongo_query = {"structure_family": query.value.value}
+    return tree.new_variation(queries=tree.queries + [mongo_query])
+
+
+def run_specs(query, tree):
+    mongo_queries = []
+
+    if query.include:
+        mongo_queries.append({"specs": {"$all": query.include}})
+
+    if query.exclude:
+        mongo_queries.append({"specs": {"$nin": query.exclude}})
+    return tree.new_variation(queries=tree.queries + mongo_queries)
+
+
 def register_queries_helper(cls):
     cls.register_query(Eq, run_eq)
-    cls.register_query(NotEq, run_eq)
+    cls.register_query(NotEq, run_neq)
     cls.register_query(Comparison, run_comparison)
     cls.register_query(Contains, run_contains)
     cls.register_query(In, run_in)
     cls.register_query(NotIn, run_notin)
+    cls.register_query(StructureFamily, run_structure_family)
+    cls.register_query(Specs, run_specs)
 
 
 class OperationEnum(str, Enum):

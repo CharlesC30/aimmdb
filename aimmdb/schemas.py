@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Generic, List, Optional, TypeVar, Union
+from typing import Generic, List, Optional, TypeVar, Union
 
 import pydantic
 import pydantic.generics
@@ -104,31 +104,44 @@ class MeasurementEnum(str, Enum):
     rixs = "rixs"
 
 
-# FIXME require more fields?
-# facility.name?
-# beamline.name?
-class XASMetadata(pydantic.BaseModel, extra=pydantic.Extra.allow):
-    element: XDIElement
-    measurement_type: MeasurementEnum = "xas"
-    dataset: str
-    sample_id: Optional[str]
+class FacilityMetadata(pydantic.BaseModel, extra=pydantic.Extra.allow):
+    name: str
+
+    @pydantic.validator("name")
+    def check_name(cls, name):
+        facilities = {"ALS", "APS", "NSLS", "NSLSII", "SSRL"}
+        if name not in facilities:
+            raise ValueError(f"{name} not a valid facility ({facilities})")
 
 
-# FIXME validate on column names?
-class XASDocument(GenericDocument[XASMetadata]):
-    @pydantic.validator("specs")
-    def check_specs(cls, specs):
-        if "XAS" not in specs:
-            raise ValueError(f"{specs=}")
-        return specs
-
-    @pydantic.validator("structure_family")
-    def check_structure_family(cls, structure_family):
-        if structure_family != StructureFamily.dataframe:
-            raise ValueError(f"{structure_family=}")
-        return structure_family
+class BeamlineMetadata(pydantic.BaseModel, extra=pydantic.Extra.allow):
+    name: str
 
 
 class SampleData(pydantic.BaseModel, extra=pydantic.Extra.allow):
     uid: Optional[str]
     name: str
+
+
+class ExperimentalXASMetadata(pydantic.BaseModel, extra=pydantic.Extra.allow):
+    element: XDIElement
+    measurement_type: MeasurementEnum = pydantic.Field("xas", const=True)
+    dataset: str
+    sample_id: Optional[str]
+    facility: FacilityMetadata
+    beamline: BeamlineMetadata
+
+
+class ChargeEnum(str, Enum):
+    C = "C"
+    DC = "DC"
+
+
+class BatteryChargeMetadataInternal(pydantic.BaseModel):
+    cycle: int
+    voltage: float
+    state: ChargeEnum
+
+
+class BatteryChargeMetadata(pydantic.BaseModel, extra=pydantic.Extra.allow):
+    charge: BatteryChargeMetadataInternal

@@ -5,6 +5,11 @@ trees:
     args:
       uri: mongodb://root:${MONGO_PASSWORD}@localhost:27018/aimm?authSource=admin
       data_directory: ./data
+      dataset_to_specs:
+        nmc:
+          - XAS_TFY
+          - XAS_TEY
+          - XAS_trans
     access_control:
       access_policy: aimmdb.access:DatasetAccessPolicy
       args:
@@ -26,3 +31,7 @@ authentication:
   tiled_admins:
     - provider: toy
       id: joe
+validation:
+  XAS_TFY: aimmdb.validation:validate_xas_tfy
+  XAS_TEY: aimmdb.validation:validate_xas_tey
+  XAS_trans: aimmdb.validation:validate_xas_transmission

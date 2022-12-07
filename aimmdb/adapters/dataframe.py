@@ -2,12 +2,10 @@ import os
 from datetime import datetime
 from sys import platform
 
-import dask
 import pandas as pd
-from fastapi import HTTPException
 from tiled.adapters.dataframe import DataFrameAdapter
-from tiled.structures.dataframe import DataFrameStructure
 from tiled.serialization.dataframe import deserialize_arrow
+from tiled.structures.dataframe import DataFrameStructure
 
 from aimmdb.access import require_write_permission
 
@@ -52,7 +50,7 @@ class WritingDataFrameAdapter:
 
     @property
     def metadata(self):
-        out = self.doc.metadata.dict()
+        out = self.doc.metadata
         _tiled = {"uid": self.doc.uid}
         out["_tiled"] = _tiled
         return out

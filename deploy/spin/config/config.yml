@@ -4,17 +4,12 @@ trees:
     args:
       uri: mongodb://root:${MONGO_PASSWORD}@mongodb:27017/aimm?authSource=admin
       data_directory: /data
-      spec_to_document_model:
-        XAS: aimmdb.schemas:XASDocument
       dataset_to_specs:
+        ncm:
+          - XAS_TFY
+          - XAS_TEY
+          - XAS_trans
         newville:
-          - XAS
-        aimm:
-          - XAS
-          - RIXS
-        aimm_core:
-          - XAS
-        iss:
           - XAS
     access_control:
       access_policy: aimmdb.access:DatasetAccessPolicy
@@ -52,7 +47,7 @@ trees:
             sandbox: rw
             samples: rw
           0000-0002-2473-0193: # Juan
-            default: r
+            default: rw
             sandbox: rw
             samples: rw
           0000-0003-0922-1363: # Maria
@@ -81,7 +76,7 @@ authentication:
       args:
         client_id: ${ORCID_CLIENT_ID}
         client_secret: ${ORCID_CLIENT_SECRET}
-        redirect_uri: https://aimm-staging.lbl.gov/api/auth/provider/orcid/login
+        redirect_uri: https://aimm.lbl.gov/api/auth/provider/orcid/login
         public_keys:
           - kty: "RSA"
             e: "AQAB"
@@ -101,3 +96,9 @@ database:
 uvicorn:
   host: 0.0.0.0
   port: 8000
+validation:
+  XAS: aimmdb.validation:validate_xas_metadata
+  XAS_TFY: aimmdb.validation:validate_xas_tfy
+  XAS_TEY: aimmdb.validation:validate_xas_tey
+  XAS_trans: aimmdb.validation:validate_xas_transmission
+  HasBatteryChargeData: aimmdb.validation:validate_battery_charge_data

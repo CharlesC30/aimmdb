@@ -1,6 +1,7 @@
 import dataclasses
 import importlib
 import json
+from functools import lru_cache
 
 import h5py
 import pydantic
@@ -37,18 +38,20 @@ def read_group(g, jsoncompat=False):
     return out
 
 
-_ELEMENT_DATA = None
-
-
+@lru_cache(maxsize=1)
 def get_element_data():
-    # load on first access
-    global _ELEMENT_DATA
-    if _ELEMENT_DATA is None:
-        fname = importlib.resources.files("aimmdb") / "data" / "elements.json"
-        with open(fname, "r") as f:
-            data = json.load(f)
-        _ELEMENT_DATA = data
-    return _ELEMENT_DATA
+    """Returns a dictionary containing allowed values for elements and XAS
+    edges. Caches its result so it only has to read from disk once.
+
+    Returns
+    -------
+    dict
+    """
+
+    fname = importlib.resources.files("aimmdb") / "data" / "elements.json"
+    with open(fname, "r") as f:
+        data = json.load(f)
+    return data
 
 
 def get_share_aimmdb_path():

@@ -1,5 +1,3 @@
-from typing import Dict
-
 import pydantic
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from tiled.server.core import json_or_msgpack

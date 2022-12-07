@@ -1,27 +1,17 @@
 import collections.abc
 import copy
-import json
 import os
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Dict
 
 import pydantic
 import pymongo
 from fastapi import HTTPException
-from tiled.adapters.utils import IndexersMixin, tree_repr
 from tiled.iterviews import ItemsView, KeysView, ValuesView
-from tiled.queries import Comparison, Eq
 from tiled.query_registration import QueryTranslationRegistry
 from tiled.structures.core import StructureFamily
-from tiled.serialization.dataframe import serialize_arrow
-from tiled.utils import (
-    APACHE_ARROW_FILE_MIME_TYPE,
-    UNCHANGED,
-    DictView,
-    ListView,
-    import_object,
-)
+from tiled.utils import APACHE_ARROW_FILE_MIME_TYPE, UNCHANGED
 
 import aimmdb.queries
 import aimmdb.uid
@@ -30,7 +20,6 @@ from aimmdb.adapters.array import WritingArrayAdapter
 from aimmdb.adapters.dataframe import WritingDataFrameAdapter
 from aimmdb.queries import OperationEnum, parse_path, register_queries_helper
 from aimmdb.schemas import GenericDocument
-from aimmdb.utils import make_dict
 
 _mime_structure_association = {
     StructureFamily.array: "application/x-hdf5",
@@ -45,12 +34,7 @@ key_to_query = {
     "sample": "metadata.sample_id",
 }
 
-# default document model requires dataset in metadata
-class MetadataBase(pydantic.BaseModel, extra=pydantic.Extra.allow):
-    dataset: str
-
-
-Document = GenericDocument[MetadataBase]
+Document = GenericDocument[Dict]
 
 
 class AIMMCatalog(collections.abc.Mapping):
@@ -77,7 +61,6 @@ class AIMMCatalog(collections.abc.Mapping):
         principal=None,
         access_policy=None,
         path=None,
-        spec_to_document_model=None,
         dataset_to_specs=None,
     ):
 
@@ -123,15 +106,6 @@ class AIMMCatalog(collections.abc.Mapping):
             if sample is not None:
                 self.metadata["_tiled"]["sample"] = sample
 
-        if spec_to_document_model is None:
-            self.spec_to_document_model = defaultdict(lambda: Document)
-        else:
-            default_document_model = spec_to_document_model.pop("default", Document)
-            self.spec_to_document_model = defaultdict(
-                lambda: default_document_model,
-                {k: import_object(v) for k, v in spec_to_document_model.items()},
-            )
-
         self.dataset_to_specs = dataset_to_specs or {}
 
         super().__init__()
@@ -148,7 +122,6 @@ class AIMMCatalog(collections.abc.Mapping):
         *,
         metadata=None,
         access_policy=None,
-        spec_to_document_model=None,
         dataset_to_specs=None,
     ):
         if not pymongo.uri_parser.parse_uri(uri)["database"]:
@@ -162,7 +135,6 @@ class AIMMCatalog(collections.abc.Mapping):
             data_directory=data_directory,
             metadata=metadata,
             access_policy=access_policy,
-            spec_to_document_model=spec_to_document_model,
             dataset_to_specs=dataset_to_specs,
         )
 
@@ -173,7 +145,6 @@ class AIMMCatalog(collections.abc.Mapping):
         *,
         metadata=None,
         access_policy=None,
-        spec_to_document_model=None,
         dataset_to_specs=None,
     ):
         import mongomock
@@ -186,7 +157,6 @@ class AIMMCatalog(collections.abc.Mapping):
             data_directory=data_directory,
             metadata=metadata,
             access_policy=access_policy,
-            spec_to_document_model=spec_to_document_model,
             dataset_to_specs=dataset_to_specs,
         )
 
@@ -242,7 +212,6 @@ class AIMMCatalog(collections.abc.Mapping):
             access_policy=self.access_policy,
             principal=principal,
             path=path,
-            spec_to_document_model=self.spec_to_document_model,
             dataset_to_specs=self.dataset_to_specs,
             **kwargs,
         )
@@ -253,19 +222,43 @@ class AIMMCatalog(collections.abc.Mapping):
         """
         return self.query_registry(query, self)
 
+    def get_distinct(self, metadata, structure_families, specs, counts):
+        data = {}
+
+        select = {"$match": self._build_mongo_query(self.op.select)}
+
+        if counts:
+            project = {"$project": {"_id": 0, "value": "$_id", "count": "$count"}}
+        else:
+            project = {"$project": {"_id": 0, "value": "$_id"}}
+
+        if metadata:
+            data["metadata"] = {}
+
+            for metadata_key in metadata:
+                group = {
+                    "$group": {"_id": f"$metadata.{metadata_key}", "count": {"$sum": 1}}
+                }
+                data["metadata"][f"{metadata_key}"] = list(
+                    self.metadata_collection.aggregate([select, group, project])
+                )
+
+        if structure_families:
+            group = {"$group": {"_id": "$structure_family", "count": {"$sum": 1}}}
+            data["structure_families"] = list(
+                self.metadata_collection.aggregate([select, group, project])
+            )
+
+        if specs:
+            group = {"$group": {"_id": "$specs", "count": {"$sum": 1}}}
+            data["specs"] = list(
+                self.metadata_collection.aggregate([select, group, project])
+            )
+
+        return data
+
     def sort(self, sorting):
         return self.new_variation(sorting=sorting)
-
-    def _get_document_model(self, specs):
-        # FIXME think more about how to handle multiple specs
-        spec_to_document_model_keys = set(self.spec_to_document_model).intersection(
-            specs
-        )
-        if len(spec_to_document_model_keys) > 1:
-            raise KeyError(f"specs {specs} matched more than one document model")
-        k = spec_to_document_model_keys.pop() if spec_to_document_model_keys else None
-        document_model = self.spec_to_document_model[k]
-        return document_model
 
     def post_sample(self, sample):
         # FIXME this is a bit adhoc (samples is not a 'real' dataset)
@@ -279,7 +272,7 @@ class AIMMCatalog(collections.abc.Mapping):
 
         sample.uid = aimmdb.uid.uid()
         result = self.sample_collection.insert_one(sample.dict())
-        assert result.acknowledged == True
+        assert result.acknowledged
         return sample.uid
 
     def delete_sample(self, uid):
@@ -305,6 +298,7 @@ class AIMMCatalog(collections.abc.Mapping):
             )
 
         # NOTE this is enforced outside of pydantic
+        # FIXME should there be a native tiled mechanism to perform default validation regardless of spec?
         dataset = metadata.get("dataset")
         if dataset is None:
             raise HTTPException(
@@ -322,12 +316,7 @@ class AIMMCatalog(collections.abc.Mapping):
         key = aimmdb.uid.uid()
 
         try:
-            document_model = self._get_document_model(specs)
-        except KeyError as err:
-            raise HTTPException(status_code=400, detail=f"{err}")
-
-        try:
-            validated_document = document_model(
+            validated_document = Document(
                 uid=key,
                 structure_family=structure_family,
                 structure=structure,
@@ -352,11 +341,7 @@ class AIMMCatalog(collections.abc.Mapping):
                     detail=f"specs ({specs}) are not a non-empty subset of allowed specs ({allowed_specs}) for dataset {dataset}",
                 )
 
-        # FIXME what if metadata is a dict?
-        try:
-            sample_id = validated_document.metadata.sample_id
-        except AttributeError:
-            sample_id = None
+        sample_id = validated_document.metadata.get("sample_id", None)
 
         doc_dict = validated_document.dict()
 
@@ -376,11 +361,8 @@ class AIMMCatalog(collections.abc.Mapping):
         return key
 
     def _build_node_from_doc(self, doc):
-        specs = doc.get("specs", [])
-        document_model = self._get_document_model(specs)
-
-        doc = document_model.parse_obj(doc)
-        dataset = doc.metadata.dataset
+        doc = Document.parse_obj(doc)
+        dataset = doc.metadata["dataset"]
 
         permissions = self.permissions(dataset)
 
@@ -484,7 +466,7 @@ class AIMMCatalog(collections.abc.Mapping):
                 if order == -1:
                     distinct = list(reversed(distinct))
                 for v in distinct[skip : skip + limit]:
-                    if v is not None: # FIXME how should we filter None
+                    if v is not None:  # FIXME how should we filter None
                         yield v
         elif self.op.op_enum == OperationEnum.lookup:
             raise RuntimeError("unreachable")

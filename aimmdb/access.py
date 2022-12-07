@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from fastapi import HTTPException
 from tiled.adapters.mapping import MapAdapter
-from tiled.utils import SpecialUsers, import_object
+from tiled.utils import SpecialUsers
 
 from aimmdb.queries import In
 
@@ -139,8 +139,6 @@ class DatasetAccessPolicy:
     def filter_results(self, tree, principal):
         principal_id = self.get_id(principal)
         principal_access_list = self.access_lists.get(principal_id, {})
-
-        default = principal_access_list.default_factory()
 
         if READ in principal_access_list.default_factory():
             # FIXME default grants access to everything
